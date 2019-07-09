@@ -1,0 +1,126 @@
+---
+- name: Instala laboratorio para clases de robotica
+  hosts: fisicos
+  strategy: free
+  tasks:
+    - name: Instala pip3
+      apt:
+        name: python3-pip
+        state: present
+      become: yes
+    - name: Instala esptool con pip
+      pip:
+        name: esptool 
+        state: latest
+        executable: pip3
+      become: yes
+    - name: Instala ampy con pip
+      pip:
+        name: adafruit-ampy 
+        state: latest
+        executable: pip3
+      become: yes
+    - name: Remueve paquetes no necesarios o en conflicto de recursos
+      apt:
+        name: "{{ item }}"
+        state: absent
+      become: yes
+      with_items:
+        - modemmanager
+        - deja-dup
+    - name: Instala paquetes requeridos por los instructores
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - vim
+        - virt-manager
+        - virtualbox
+        - fritzing
+        - bridge-utils
+        - qemu-kvm
+        - qemu-system
+        - libvirt-bin
+        - ubuntu-vm-builder
+        - pwgen
+        - gnome-shell
+        - gnome-tweak-tool
+        - chromium-browser
+        - screen
+        - byobu
+        - openssh-server
+        - dia
+        - shutter
+        - vlc
+        - mpv
+        - wakeonlan
+      become: yes
+    - name: Elimina versión vieja de Arduino IDE
+      file:
+        path: /usr/local/bin/arduino-1.6.13/
+        state: absent
+      become: yes
+    - name: Crea liga de arduino
+      file:
+        state: link
+        src: /usr/local/arduino-1.8.9/arduino
+        dest: /usr/bin/arduino
+        force: yes
+      become: yes
+    - name: Elimina config de arduino (.arduino15/) en usuario
+      file:
+        state: absent
+        dest: "{{ ansible_env.HOME }}/.arduino15"
+        force: yes
+      become: yes
+    - name: Elimina config de arduino (Arduino/) en usuario
+      file:
+        state: absent
+        dest: "{{ ansible_env.HOME }}/Arduino"
+        force: yes
+      become: yes
+    - name: Descarga CircuitPython para ESP8266 Feather
+      get_url:
+        url: https://github.com/adafruit/circuitpython/releases/download/4.0.0/adafruit-circuitpython-circuitplayground_express-es-4.0.0.uf2
+        dest: "{{ ansible_env.HOME }}/"
+    - name: Copia instalador de arduino
+      unarchive:
+        dest: /usr/local/
+        src: https://downloads.arduino.cc/arduino-1.8.9-linux64.tar.xz
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        remote_src: yes
+      become: yes
+    - name: Ejecuta instalador de Arduino
+      command: /usr/local/arduino-1.8.9/install.sh
+      become: yes
+    - name: Configura tarjetas adicionales para Arduino
+      # ESP8266 -> http://www.crcibernetica.com/adafruit-feather-huzzah-with-esp8266-wifi/
+      # RISCV HiFive1 -> https://www.crowdsupply.com/sifive/hifive1/
+      # Adafruit -> https://www.adafruit.com/feather
+      # Moteino -> http://www.crcibernetica.com/miniwireless-rfm69hw-915mhz/
+      # ESP32 -> http://www.crcibernetica.com/ttgo-esp32-with-lora-and-oled-display-us915/
+      # STM32 -> http://www.crcibernetica.com/stm32f103c8t6-arm-stm32-blue-pill-microcontroller-board/
+      command: arduino --pref boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json,http://static.dev.sifive.com/bsp/arduino/package_sifive_index.json,https://adafruit.github.io/arduino-board-index/package_adafruit_index.json,https://lowpowerlab.github.io/MoteinoCore/package_LowPowerLab_index.json,https://dl.espressif.com/dl/package_esp32_index.json,http://dan.drown.org/stm32duino/package_STM32duino_index.json --save-prefs
+    - name: Instala placas adicionales en Arduino
+      command: arduino --install-boards "{{ item }}"
+      with_items:
+        - esp8266:esp8266
+        - adafruit:avr
+        - arduino:sam
+        - arduino:samd
+        - arduino:avr
+        - adafruit:samd
+        - sifive:riscv
+        - esp32:esp32
+        - stm32duino:STM32F1
+    - name: Instala librerias adicionales en Arduino
+      command: arduino --install-library "{{ item }}"
+      with_items:
+        - "Adafruit SleepyDog Library"
+        - "Adafruit Circuit Playground"
+    - name: Descarga Icestudio
+      git:
+        repo: https://github.com/FPGAwars/icestudio.git
+        dest: "{{ ansible_env.HOME }}/icestudio"
+ 

@@ -1,0 +1,126 @@
+---
+- name: Instala la base para los equipos de los laboratorios de Greencore Solutions
+  hosts: fisicos
+  strategy: free
+  tasks:
+  - name: Instala paquetes requeridos para esta receta
+    apt: 
+      name: ['libpython-dev', 'gcc', 'lxc', 'lxc-dev', 'python-pip', 'libvirt-bin', 'chromium-browser', 'libguestfs-tools']
+      state: present
+    become: yes
+  - name: Deshabilita biosdevname
+    lineinfile:
+      regexp: '^GRUB_CMDLINE_LINUX=""'
+      dest: "/etc/default/grub"
+      line: 'GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"'
+      state: present
+      backrefs: yes
+    become: yes
+    register: grub_default_biosdevname
+  - name: Actualiza grub luego de deshabilitar biosdevname
+    command: grub-mkconfig -o /boot/grub/grub.cfg
+    ignore_errors: true
+    become: yes
+    when: grub_default_biosdevname.changed
+  - name: Plantilla de jinja para archivo interfaces
+    copy:
+      src: files/interfaces
+      dest: /etc/network/interfaces
+      mode: 0644
+      owner: root
+      group: root
+    become: yes
+  - name: Fog DHCP Hostname en dhclient hooks
+    copy:
+      dest: /etc/dhcp/dhclient-enter-hooks.d/unset_old_hostname
+      content: "unset old_host_name"
+      mode: 0644
+      owner: root
+      group: root
+    become: yes
+  - name: Configura kernel para que funcione como router
+    sysctl:
+      name: net.ipv4.ip_forward
+      value: 1
+      sysctl_set: yes
+      state: present
+      reload: yes
+    become: yes
+  - name: Instala dependencias de python para módulo de ansible de LXC
+    pip: name=lxc-python2 state=present
+    become: yes
+  - name: Configura defaults de LXC
+    lineinfile:
+      regexp: "lxc.network.link = lxcbr0"
+      dest: "/etc/lxc/default.conf"
+      line: "lxc.network.link = br0"
+      state: present
+      backrefs: yes
+    become: yes
+  - name: Crea directorio para cliente de SSH
+    file:
+      path: "{{ ansible_env.HOME }}/.ssh/"
+      state: directory
+      mode: 0755
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+  - name: Configura cliente de SSH
+    copy:
+      dest: "{{ ansible_env.HOME }}/.ssh/config"
+      content: |
+              Host 10.42.24.*
+                StrictHostKeyChecking no
+                UserKnownHostsFile=/dev/null
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+  - name: Crea reglas de ACL para trabajar en directorio de virtuales
+    acl:
+      path: /var/lib/libvirt/images/
+      entity: "{{ ansible_user }}"
+      etype: user
+      permissions: rwX
+      state: present
+      recursive: yes
+    become: yes
+  - name: Apaga todos los contenedores
+    command: "lxc-stop -n {{ item }}"
+    with_items:
+      - inseguro
+    become: yes
+    ignore_errors: true
+  - name: Destruye todos los contenedores
+    command: "lxc-destroy -n {{ item }}"
+    with_items:
+      - inseguro
+    become: yes
+    ignore_errors: true
+  - name: Crea contenedor inseguro
+    lxc_container:
+      name: inseguro
+      container_log: true
+      container_config:
+        - lxc.network.link = br0
+        - lxc.start.auto = 1
+        - lxc.start.delay = 120
+        - lxc.start.order = 0
+        - lxc.network.hwaddr = {{ mac01 }}
+      template: download
+      state: started
+      template_options: -d ubuntu -r xenial -a amd64
+    become: yes
+  - name: Apaga todos los contenedores
+    command: "lxc-stop -n {{ item }}"
+    with_items:
+      - inseguro
+    become: yes
+    ignore_errors: true
+  - name: Destruye todos los contenedores
+    command: "lxc-destroy -n {{ item }}"
+    with_items:
+      - inseguro
+    become: yes
+    ignore_errors: true
+  - name: Deshabilita tracker
+    command: tracker daemon -t
+  - name: Deshabilita tracker
+    command: tracker daemon -k

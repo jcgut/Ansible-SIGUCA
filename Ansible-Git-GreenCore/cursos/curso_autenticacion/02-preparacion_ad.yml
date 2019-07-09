@@ -1,0 +1,44 @@
+---
+- name: Prepara los clientes para agregarlos al Directorio Activo
+  hosts: fisicos
+  tasks:
+  - name: Usa debconf para responde las preguntas que haría APT
+    debconf:
+      name: krb5-config
+      question: krb5-config/default_realm
+      value: greencore.int
+      vtype: string
+    become: yes
+  - name: Instala paquetes requeridos para esta receta
+    apt: 
+      name: "{{ item }}"
+      state: installed
+    with_items:
+      - realmd
+      - ntp
+      - sssd
+      - adcli
+      - krb5-user 
+      - sssd-tools
+      - samba-common
+      - packagekit
+      - samba-common-bin
+      - samba-libs
+    become: yes
+  - name: Configura servicio de hora
+    service:
+      name: ntp
+      enabled: yes
+      state: started
+    become: yes
+  - name: Configuración de interfaces
+    copy:
+      src: files/realmd.conf
+      dest: /etc/realmd.conf
+      mode: 0644
+      owner: root
+      group: root
+    become: yes
+  - name: Pausa para sincronizado de hora
+    pause:
+      seconds: 10

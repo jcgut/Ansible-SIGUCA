@@ -1,0 +1,17 @@
+---
+- name: Configuramos mirror local, para equipos en Greencore Solutions
+  hosts: contenedores
+  strategy: free
+  tasks:
+    - name: Cambia cr.archive por ubuntu-mirror
+      replace: >
+        regexp="deb http:\/\/archive.ubuntu.com"
+        replace="deb http://ubuntu-mirror.greencore.int"
+        dest=/etc/apt/sources.list
+      become: yes
+    - name: Elimina lineas que referencien a backports
+      lineinfile: >
+        regexp="-backports"
+        dest=/etc/apt/sources.list
+        state=absent
+      become: yes

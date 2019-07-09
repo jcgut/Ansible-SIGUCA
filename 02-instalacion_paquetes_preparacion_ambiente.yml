@@ -1,0 +1,51 @@
+---
+- name: Instala la base para los equipos de los laboratorios de Greencore Solutions
+  hosts: contenedores
+  strategy: free
+  tasks:
+    - name: Instala paquetes requeridos para esta receta
+      apt: 
+        name: ['acl', 'vim', 'gcc', 'bash-completion', 'mongodb', 'npm', 'rsync', 'libfontconfig', 'git']
+        state: present
+      become: true
+    - name: Clonado del repositorio
+      git:
+        repo: https://github.com/Greencorecr/SIGUCA.git
+        version: desarrollo-gps
+        dest: /usr/local/bin/siguca
+      become: true  
+    - name: Configuración de ACL para usuario greencore en /usr/local/bin/siguca
+      acl:
+        path: /usr/local/bin/siguca
+        entity: greencore
+        recursive: yes 
+        etype: user
+        permissions: rwx
+        state: present
+      become: true  
+    - name: Instala las dependencias de NPM
+      npm:
+        path: /usr/local/bin/siguca
+    - name: Restore necesario de la BD para que entienda el HTML
+      shell: "cd /usr/local/bin/siguca/DB/ && mongorestore"
+      become: true
+    - name: Creación de siguca.service
+      copy:
+        src: files/siguca.service
+        dest: /etc/systemd/system/siguca.service 
+        owner: root
+        group: root
+        mode: 0644
+      become: true
+      tags: service
+    - name: Actualizar el servicio de siguca.service
+      systemd:
+        daemon_reload: true
+      become: true
+      tags: daemon
+    - name: Habilitar SIGUCA
+      systemd:
+        name: siguca.service
+        enabled: true
+      become: true
+      tags: enable

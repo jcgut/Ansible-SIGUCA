@@ -1,0 +1,11 @@
+[Unit]
+Description=SIGUCA MASTER
+
+[Service]
+ExecStart=/bin/bash -c 'cd /usr/local/bin/siguca && /usr/bin/sudo /usr/bin/node app.js'
+StandardOutput=syslog
+StandardError=syslog
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
